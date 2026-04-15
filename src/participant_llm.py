@@ -68,7 +68,7 @@ Example output format:
 
         try:
             chain = self.prompt | self.llm
-            result = chain.invoke([("human", context)])
+            result = chain.invoke({"messages": [("human", context)]})
 
             # result is already a ParticipantLabels Pydantic model
             # Normalize keys to match pyannote format (SPEAKER_0 -> SPEAKER_00, etc.)
