@@ -49,10 +49,10 @@ class ParticipantLabeler:
   - "name": participant name if identified, otherwise null
 
 Example output format:
-{
-  "SPEAKER_0": {"role": "agent", "name": "John"},
-  "SPEAKER_1": {"role": "customer", "name": null}
-}"""
+{{
+  "SPEAKER_0": {{"role": "agent", "name": "John"}},
+  "SPEAKER_1": {{"role": "customer", "name": null}}
+}}"""
 
         self.prompt = ChatPromptTemplate.from_messages(
             [
