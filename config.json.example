@@ -1,0 +1,109 @@
+{
+  "description": "Support Call QA System - Fully Private, Low Hardware Requirements",
+  "version": "2.0",
+  "directories": {
+    "input": "input/",
+    "output": "output/"
+  },
+  "ftp": {
+    "enabled": true,
+    "download_directory": "input/",
+    "date": null,
+    "date_start": null,
+    "date_end": null
+  },
+  "llm_provider": {
+    "type": "openai-compatible",
+    "base_url": "http://localhost:8080/v1",
+    "api_key": "dummy",
+    "models": {
+      "participant_labeler": "gemma4-4b",
+      "qa_assessor": "qwen3.5-4b"
+    },
+    "parameters": {
+      "temperature": 0.0,
+      "max_tokens": 2048
+    }
+  },
+  "audio_processing": {
+    "whisper": {
+      "model": "small",
+      "device": "cuda",
+      "compute_type": "int8",
+      "language": "en",
+      "initial_prompt": "Support agent names: Sarah, John, Mike, Lisa, David, Tom, Amy, James, Emma, Robert. Customer service terms: account number, ticket, billing, callback, hold, transfer, escalation, resolution, policy, refund, password reset, login issue, technical support."
+    },
+    "diarization": {
+      "model": "pyannote/speaker-diarization-3.1",
+      "use_hf_token": true
+    }
+  },
+  "output": {
+    "format": "json",
+    "include_timestamps": true,
+    "filename_pattern": "{recording_name}_{timestamp}.json"
+  },
+  "output_schema": {
+    "type": "object",
+    "required": [
+      "metadata",
+      "participants",
+      "qa_assessment",
+      "call_analysis",
+      "full_transcript"
+    ],
+    "properties": {
+      "metadata": {
+        "type": "object",
+        "required": [
+          "filename",
+          "processed_at",
+          "processing_time_seconds"
+        ]
+      },
+      "participants": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "speaker_id",
+            "role",
+            "name",
+            "segments"
+          ]
+        }
+      },
+      "qa_assessment": {
+        "type": "object",
+        "required": [
+          "resolution_quality",
+          "tone_phenomena",
+          "compliance",
+          "overall_rating"
+        ]
+      },
+      "call_analysis": {
+        "type": "object",
+        "required": [
+          "reason",
+          "category",
+          "summary",
+          "strengths",
+          "improvements"
+        ]
+      },
+      "full_transcript": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "required": [
+            "speaker_id",
+            "start",
+            "end",
+            "text"
+          ]
+        }
+      }
+    }
+  }
+}

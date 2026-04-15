@@ -88,3 +88,23 @@ venv.bak/
 !requirements.txt
 *.wav
 *.log
+*.mp3
+*.flac
+
+# Model and cache directories
+.huggingface/
+.cache/
+pyannote/
+models/checkpoints/
+*.pt
+*.pth
+*.safetensors
+
+# Temporary processing files
+input/*.wav
+
+# Output files (contains processed data - may contain sensitive info)
+output/
+
+# User-specific config (keep separate for security)
+config.json
