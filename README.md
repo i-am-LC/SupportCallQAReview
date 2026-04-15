@@ -118,6 +118,11 @@ FTP_IP_ADDRESS=your.ftp.server
 FTP_USERNAME=your_username
 FTP_PASSWORD=your_password
 
+# SMTP credentials (if using --email flag)
+# For Gmail, use an App Password (not your regular password)
+SMTP_USERNAME=your-email@gmail.com
+SMTP_PASSWORD=your-app-password
+
 # Optional: Override LLM endpoint
 # LLM_BASE_URL=http://localhost:8080/v1
 ```
@@ -132,13 +137,26 @@ Update `config.json` with your settings:
     "input": "input/",
     "output": "output/"
   },
-  
+
   "ftp": {
     "enabled": true,  // Set to false to skip FTP pulls
-    "download_directory": "input/"
+    "download_directory": "input/",
+    "phone_numbers": [],   // Optional: filter files containing these phone number substrings
+    "file_contains": []    // Optional: filter files containing these characters
     // Note: FTP credentials come from .env file
   },
-  
+
+  "email": {
+    "enabled": false,  // Set to true to enable email sending
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": 587,
+    "use_tls": true,
+    "from": "your-email@gmail.com",
+    "to": ["manager@company.com"],
+    "subject_prefix": "Support Call QA Report"
+    // Note: SMTP credentials come from .env file (SMTP_USERNAME, SMTP_PASSWORD)
+  },
+
   "llm_provider": {
     "base_url": "http://localhost:8080/v1",
     "api_key": "dummy",
@@ -151,7 +169,7 @@ Update `config.json` with your settings:
       "max_tokens": 2048
     }
   },
-  
+
 "audio_processing": {
   "whisper": {
     "model": "small",
@@ -211,19 +229,15 @@ Process local audio files:
 python main.py --source local --config config.json
 ```
 
-### Unified Processing
+### FTP Download and Process
 
 Download from FTP and process in one command:
 
 ```bash
-python main.py --source ftp --ftp-date 20260413 --config config.json
+python main.py --source ftp --ftp-date 20260413
 ```
 
-This will:
-1. Clear input/ and output/ directories (unless `--no-clean` is used)
-2. Download audio files from the specified FTP date
-3. Process each file through the complete pipeline
-4. Generate JSON output files
+This will download audio files from the specified FTP date and process them.
 
 ### Options
 
@@ -232,13 +246,13 @@ This will:
 python main.py --list-ftp-dates
 
 # Download from single date directory
-python main.py --source ftp --ftp-date 20260413 --config config.json
+python main.py --source ftp --ftp-date 20260413
 
 # Download from date range
-python main.py --source ftp --ftp-date-start 20260410 --ftp-date-end 20260413 --config config.json
+python main.py --source ftp --ftp-date-start 20260410 --ftp-date-end 20260413
 
 # Process only local files
-python main.py --source local --config config.json
+python main.py --source local
 
 # Override input directory
 python main.py --source local --input-dir /path/to/other/input
@@ -247,13 +261,22 @@ python main.py --source local --input-dir /path/to/other/input
 python main.py --config path/to/other_config.json
 
 # Enable verbose logging
-python main.py --source local --config config.json --verbose
+python main.py --source local --verbose
 
 # Skip GPU check (not recommended)
-python main.py --source local --config config.json --no-gpu-check
+python main.py --source local --no-gpu-check
 
-# Skip directory clearing (keep existing files)
-python main.py --source local --config config.json --no-clean
+# Clear directories before processing
+python main.py --source ftp --last-week --clear
+
+# Generate report after processing
+python main.py --source ftp --last-week --clear --report
+
+# Full pipeline with email (last week, clear, report, email)
+python main.py --source ftp --last-week --clear --report --email
+
+# Email only (sends most recent report)
+python main.py --email
 ```
 
 ### CLI Arguments
@@ -266,24 +289,56 @@ python main.py --source local --config config.json --no-clean
 - `--list-ftp-dates`: List available date directories on FTP server
 - `--input-dir`: Override input directory from config (optional)
 - `--no-gpu-check`: Skip GPU availability check (not recommended)
-- `--no-clean`: Skip clearing input/output directories
+- `--clear`: Clear input/output directories before processing
+- `--report`: Generate support rep report after processing
+- `--email`: Send report via email (uses most recent report if no processing)
+- `--last-week`: Auto-set date range to previous complete week (Mon-Sun)
 - `--verbose`: Enable verbose logging for debugging
 
 ### Report Generation
 
-After batch processing completes, the system prompts:
+After batch processing completes, use the `--report` flag to generate a markdown report:
 
 ```bash
-Generate support rep report? (y/n): y
+python main.py --source ftp --last-week --clear --report
 ```
 
-Select `y` to generate a markdown report containing:
+The report contains:
 - Up to 4 random calls per support representative
 - Full transcripts with speaker names
 - QA assessment scores and reasoning
 - Call analysis (summary, strengths, improvements)
 
 Reports are saved to `output/support_rep_report_{timestamp}.md`.
+
+### Cron Automation
+
+For scheduled weekly processing (e.g., every Monday at 6am):
+
+```bash
+# Every Monday at 6am - process previous complete week (Mon-Sun)
+0 6 * * 1 cd /path/to/SupportCallReview && \
+  source venv/bin/activate && \
+  python main.py --source ftp --last-week --clear --report --email
+```
+
+This will:
+1. Auto-calculate last week's date range (Mon-Sun)
+2. Clear input/output directories
+3. Download audio files from FTP
+4. Process all files
+5. Generate support rep report
+6. Send report via email
+
+For more control, you can also specify custom date ranges:
+
+```bash
+# Custom date range with email
+python main.py --source ftp --ftp-date-start 20260401 --ftp-date-end 20260407 --clear --report --email
+
+# Single date with email
+python main.py --source ftp --ftp-date 20260413 --clear --report --email
+```
 
 ### File Organization
 
@@ -313,7 +368,9 @@ FTP_PASSWORD=your_password
 {
   "ftp": {
     "enabled": true,
-    "download_directory": "input/"
+    "download_directory": "input/",
+    "phone_numbers": ["0399890655", "0381998400"],
+    "file_contains": ["i", "a"]
   }
 }
 ```
@@ -329,13 +386,14 @@ python main.py --source ftp --ftp-date 20260413
 # Download from date range
 python main.py --source ftp --ftp-date-start 20260410 --ftp-date-end 20260413
 
-# Download and process
-python main.py --source ftp --ftp-date 20260413 --config config.json
+# Download from previous complete week (Mon-Sun)
+python main.py --source ftp --last-week --clear --report
 ```
 
 **Note:** Date specification is REQUIRED when `--source ftp` is specified. Choose either:
 - **Single date mode**: `--ftp-date YYYYMMDD`
 - **Date range mode**: `--ftp-date-start YYYYMMDD --ftp-date-end YYYYMMDD`
+- **Last week mode**: `--last-week` (auto-calculates previous Mon-Sun)
 
 **FTP Features:**
 - ✅ Single date directory download OR date range download
@@ -346,8 +404,10 @@ python main.py --source ftp --ftp-date 20260413 --config config.json
 - ✅ List available directories with `--list-ftp-dates`
 - ✅ Skips files that already exist locally
 - ✅ Downloads to configurable directory (`input/` by default)
-- ✅ No interactive prompts - fully automated
+- ✅ File filtering by phone number substrings
+- ✅ File filtering by characters in filename
 - ✅ Support for both single and date range modes
+- ✅ `--last-week` for automated weekly processing
 
 ## Output Format
 
@@ -489,8 +549,8 @@ Processed calls are saved as JSON files in the `output/` directory with format: 
    - Includes: metadata, participants, QA assessment, call analysis, full transcript
    - Validates against schema defined in config.json
 
-7. **Report Generation** (interactive)
-   - Prompts user after processing completes
+7. **Report Generation** (via --report flag)
+   - Use `--report` flag after processing completes
    - Generates markdown report with up to 4 random calls per agent
    - Report includes: transcripts, QA scores, call analysis
    - Saved to `output/support_rep_report_{timestamp}.md`

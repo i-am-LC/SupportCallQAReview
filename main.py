@@ -5,7 +5,7 @@ import argparse
 import logging
 import time
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import ftplib
 
@@ -349,22 +349,23 @@ def clear_directories(config):
     print("=" * 70)
 
 
-def confirm_directory_clearing(config):
+def confirm_directory_clearing(config, clear=False):
     """
-    Prompt user to confirm directory clearing.
+    Clear directories based on --clear flag.
 
     Args:
         config (dict): Configuration dictionary
+        clear (bool): If True, clear directories; if False, skip
 
     Returns:
         bool: True if directories were cleared, False if skipped
     """
+    if not clear:
+        logger.info("Skipping directory clearing (use --clear to enable)")
+        return False
+
     input_dir = config["directories"]["input"]
     output_dir = config["directories"]["output"]
-
-    # Count files in each directory
-    input_count = 0
-    output_count = 0
 
     input_path = Path(input_dir)
     if input_path.exists():
@@ -374,30 +375,11 @@ def confirm_directory_clearing(config):
     if output_path.exists():
         output_count = len([f for f in output_path.glob("*") if f.is_file()])
 
-    # Display directory status
     print(f"\ninput/: {input_count} files")
     print(f"output/: {output_count} files")
 
-    # Interactive prompt
-    try:
-        response = (
-            input("\nClear directories before processing? [y/N]: ").strip().lower()
-        )
-
-        # Default to "clear" if empty (user pressed Enter)
-        if response == "":
-            response = "y"
-
-        if response in ["y", "yes"]:
-            clear_directories(config)
-            return True
-        else:
-            print("Skipping directory clearing...")
-            return False
-
-    except KeyboardInterrupt:
-        print("\n\nExiting...")
-        sys.exit(0)
+    clear_directories(config)
+    return True
 
 
 def list_ftp_directories(config):
@@ -666,9 +648,44 @@ def main():
         help="List available date directories on FTP server",
     )
 
+    parser.add_argument(
+        "--clear",
+        action="store_true",
+        help="Clear input and output directories before processing",
+    )
+
+    parser.add_argument(
+        "--report",
+        action="store_true",
+        help="Generate support rep report after processing",
+    )
+
+    parser.add_argument(
+        "--email",
+        action="store_true",
+        help="Send report via email after processing",
+    )
+
+    parser.add_argument(
+        "--last-week",
+        action="store_true",
+        help="Automatically set date range to previous complete week (Mon-Sun)",
+    )
+
     parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
 
     args = parser.parse_args()
+
+    # Handle --last-week flag - auto-calculate previous week (Mon-Sun)
+    if args.last_week:
+        today = datetime.now()
+        current_week_monday = today - timedelta(days=today.weekday())
+        last_week_monday = current_week_monday - timedelta(days=7)
+        last_week_sunday = last_week_monday + timedelta(days=6)
+
+        args.ftp_date_start = last_week_monday.strftime("%Y%m%d")
+        args.ftp_date_end = last_week_sunday.strftime("%Y%m%d")
+        logger.info(f"Last week: {args.ftp_date_start} to {args.ftp_date_end}")
 
     # Load environment variables
     load_dotenv()
@@ -707,9 +724,9 @@ def main():
     input_dir = args.input_dir or config["directories"]["input"]
     logger.info(f"Input directory: {input_dir}")
 
-    # Prompt user to confirm directory clearing
+    # Handle directory clearing based on --clear flag
     try:
-        confirm_directory_clearing(config)
+        confirm_directory_clearing(config, args.clear)
     except Exception as e:
         logger.error(f"Failed to clear directories: {e}")
         sys.exit(1)
@@ -779,17 +796,26 @@ def main():
     logger.info(f"Completed at: {datetime.now().isoformat()}")
     logger.info("=" * 70)
 
-    # Prompt for report generation if files were processed
-    if processing_results and processing_results.get("successful", 0) > 0:
-        try:
-            response = input("\nGenerate support rep report? (y/n): ").strip().lower()
-            if response in ["y", "yes"]:
-                from src.report_generator import generate_report
+    # Generate report if --report flag is set
+    if (
+        args.report
+        and processing_results
+        and processing_results.get("successful", 0) > 0
+    ):
+        from src.report_generator import generate_report
 
-                output_dir = config["directories"]["output"]
-                generate_report(output_dir)
-        except KeyboardInterrupt:
-            print("\nSkipping report generation...")
+        output_dir = config["directories"]["output"]
+        generate_report(output_dir)
+
+    # Send email if --email flag is set
+    if args.email:
+        from src.email_sender import send_report_email
+
+        output_dir = config["directories"]["output"]
+        email_sent = send_report_email(config, output_dir=output_dir)
+
+        if not email_sent:
+            logger.warning("Email could not be sent")
 
     # Exit with appropriate code
     sys.exit(0)

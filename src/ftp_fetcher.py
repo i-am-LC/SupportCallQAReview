@@ -21,6 +21,10 @@ class FTPFetcher:
         self.date_start = config.get("date_start")
         self.date_end = config.get("date_end")
 
+        # Optional filters
+        self.phone_numbers = config.get("phone_numbers", [])
+        self.file_contains = config.get("file_contains", [])
+
         # Validate that at least one mode is provided
         if not self.ftp_date and not (self.date_start and self.date_end):
             raise RuntimeError(
@@ -265,16 +269,56 @@ class FTPFetcher:
             return []
 
     def _get_files_in_directory(self, ftp, directory):
-        """Get list of files in a directory."""
+        """Get list of files in a directory with optional filtering."""
         try:
             ftp.cwd(directory)
             files = ftp.nlst()
             ftp.cwd("..")
-            return files
+
+            logger.info(f"FTP directory {directory}: {len(files)} files found")
+
+            # Apply filters if configured
+            filtered_files = self._filter_files(files)
+            return filtered_files
 
         except Exception as e:
             logger.error(f"Failed to get files in directory {directory}: {e}")
             return []
+
+    def _filter_files(self, files):
+        """Filter files based on phone_numbers and file_contains with detailed logging."""
+        if not self.phone_numbers and not self.file_contains:
+            return files
+
+        initial_count = len(files)
+
+        if self.phone_numbers:
+            phone_matched = []
+            for f in files:
+                if any(phone in f for phone in self.phone_numbers):
+                    phone_matched.append(f)
+            logger.info(
+                f"  After phone_numbers filter: {len(phone_matched)} files ({len(files) - len(phone_matched)} removed)"
+            )
+            files = phone_matched
+
+        if self.file_contains:
+            char_matched = []
+            for f in files:
+                if any(char in f for char in self.file_contains):
+                    char_matched.append(f)
+            if self.phone_numbers:
+                logger.info(
+                    f"  After file_contains filter: {len(char_matched)} files ({len(files) - len(char_matched)} removed)"
+                )
+            else:
+                logger.info(
+                    f"  After file_contains filter: {len(char_matched)} files ({initial_count - len(char_matched)} removed)"
+                )
+            files = char_matched
+
+        logger.info(f"Filtered {initial_count} files to {len(files)} files")
+        return files
 
     def _is_audio_file(self, filename):
         """Check if file is an audio file."""

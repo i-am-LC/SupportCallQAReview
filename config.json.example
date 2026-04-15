@@ -10,7 +10,18 @@
     "download_directory": "input/",
     "date": null,
     "date_start": null,
-    "date_end": null
+    "date_end": null,
+    "phone_numbers": [],
+    "file_contains": []
+  },
+  "email": {
+    "enabled": false,
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": 587,
+    "use_tls": true,
+    "from": "your-email@gmail.com",
+    "to": ["manager@company.com"],
+    "subject_prefix": "Support Call QA Report"
   },
   "llm_provider": {
     "type": "openai-compatible",
