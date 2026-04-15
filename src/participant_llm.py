@@ -44,7 +44,15 @@ class ParticipantLabeler:
         - "you can call me [name]"
         - "this is [name] from [company]"
 
-        Output the speaker ID to role and name mapping."""
+        Output a JSON object mapping each speaker ID (e.g., SPEAKER_0, SPEAKER_1) to an object containing:
+  - "role": either "agent" or "customer" (required)
+  - "name": participant name if identified, otherwise null
+
+Example output format:
+{
+  "SPEAKER_0": {"role": "agent", "name": "John"},
+  "SPEAKER_1": {"role": "customer", "name": null}
+}"""
 
         self.prompt = ChatPromptTemplate.from_messages(
             [
