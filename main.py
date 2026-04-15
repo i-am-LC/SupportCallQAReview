@@ -676,6 +676,36 @@ def main():
 
     args = parser.parse_args()
 
+    # Handle --email-only mode: skip processing when --email is used without any processing flags
+    email_only_mode = args.email and (
+        args.source == "both"
+        and not args.ftp_date
+        and not args.ftp_date_start
+        and not args.ftp_date_end
+        and not args.last_week
+        and not args.report
+        and not args.list_ftp_dates
+        and not args.clear
+    )
+
+    if email_only_mode:
+        load_dotenv()
+        try:
+            config = load_config(args.config)
+        except Exception as e:
+            logger.error(f"Failed to load configuration: {e}")
+            sys.exit(1)
+
+        from src.email_sender import send_report_email
+
+        output_dir = config["directories"]["output"]
+        email_sent = send_report_email(config, output_dir=output_dir)
+
+        if not email_sent:
+            logger.warning("Email could not be sent")
+            sys.exit(1)
+        sys.exit(0)
+
     # Handle --last-week flag - auto-calculate previous week (Mon-Sun)
     if args.last_week:
         today = datetime.now()
