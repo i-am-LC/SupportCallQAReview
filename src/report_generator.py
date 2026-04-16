@@ -135,7 +135,7 @@ def format_agent_report(agent_name, calls):
     if not calls:
         return ""
 
-    selected_calls = get_random_calls(calls, max_calls=4)
+    selected_calls = get_random_calls(calls, max_calls=3)
 
     lines = [f"\n## {agent_name} ({len(selected_calls)} calls analyzed)\n"]
 
@@ -167,7 +167,8 @@ def format_agent_report(agent_name, calls):
         lines.append("")
         lines.append("#### Call Analysis")
         lines.append(format_call_analysis(call))
-        return "\n".join(lines)
+
+    return "\n".join(lines)
 
 
 def generate_report(output_dir):
